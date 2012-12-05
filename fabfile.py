@@ -31,9 +31,11 @@ BACKUP_DIR = os.path.join(HOME, "backups/")
 PROJECT_ROOT = os.path.join(HOME, "project/")
 PYPLN_BACKEND_ROOT = os.path.join(PROJECT_ROOT, "backend")
 PYPLN_WEB_ROOT = os.path.join(PROJECT_ROOT, "web/")
+PYPLN_DEPLOY_ROOT = os.path.join(PROJECT_ROOT, "deploy/")
 DJANGO_PROJECT_ROOT = os.path.join(PYPLN_WEB_ROOT, "pypln/web/")
 BACKEND_REPO_URL = "https://github.com/NAMD/pypln.backend.git"
 WEB_REPO_URL = "https://github.com/NAMD/pypln.web.git"
+DEPLOY_REPO_URL = "https://github.com/NAMD/pypln-deploy.git"
 ACTIVATE_SCRIPT = os.path.join(PROJECT_ROOT, "bin/activate")
 
 def _reload_supervisord():
@@ -50,6 +52,8 @@ def _update_code(rev="master"):
     with cd(PYPLN_BACKEND_ROOT):
         _update_repository(rev)
     with cd(PYPLN_WEB_ROOT):
+        _update_repository(rev)
+    with cd(PYPLN_DEPLOY_ROOT):
         _update_repository(rev)
 
 def create_db(db_user, db_name, db_host="localhost", db_port=5432):
@@ -123,11 +127,12 @@ def initial_setup(rev="master"):
     with settings(warn_only=True, user=USER):
         run("git clone {} {}".format(WEB_REPO_URL, PYPLN_WEB_ROOT))
         run("git clone {} {}".format(BACKEND_REPO_URL, PYPLN_BACKEND_ROOT))
+        run("git clone {} {}".format(DEPLOY_REPO_URL, PYPLN_DEPLOY_ROOT))
         _update_code(rev)
         run("virtualenv --system-site-packages {}".format(PROJECT_ROOT))
 
     for daemon in ["router", "pipeliner", "broker", "web"]:
-        config_file_path = os.path.join(PYPLN_BACKEND_ROOT,
+        config_file_path = os.path.join(PYPLN_DEPLOY_ROOT,
                 "server_config/pypln-{}.conf".format(daemon))
         sudo("ln -sf {} /etc/supervisor/conf.d/".format(config_file_path))
 
@@ -143,7 +148,7 @@ def initial_setup(rev="master"):
 
     _reload_supervisord()
 
-    nginx_vhost_path = os.path.join(PYPLN_BACKEND_ROOT, "server_config/nginx.conf")
+    nginx_vhost_path = os.path.join(PYPLN_DEPLOY_ROOT, "server_config/nginx.conf")
     sudo("ln -sf {} /etc/nginx/sites-enabled/pypln".format(nginx_vhost_path))
     sudo("service nginx restart")
 
