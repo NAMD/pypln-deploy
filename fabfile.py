@@ -56,6 +56,55 @@ def _update_code(rev="master"):
     with cd(PYPLN_DEPLOY_ROOT):
         _update_repository(rev)
 
+def _create_secret_key_file():
+    valid_chars = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)'
+    secret_key = ''.join([random.choice(valid_chars) for i in range(50)])
+    secret_key_file_path = os.path.join(HOME, ".secret_key")
+    sudo("echo '{}' > {}".format(secret_key, secret_key_file_path))
+    sudo('chown {0}:{0} {1}'.format(USER, secret_key_file_path))
+
+def _create_deploy_user():
+    with settings(warn_only=True):
+        user_does_not_exist = run("id {}".format(USER)).failed
+
+    if user_does_not_exist:
+        sudo("useradd --shell=/bin/bash --home {} --create-home {}".format(
+            HOME, USER))
+        sudo("mkdir {}".format(LOG_DIR))
+        sudo("chown -R {0}:{0} {1}".format(USER, LOG_DIR))
+        sudo("mkdir {}".format(BACKUP_DIR))
+        sudo("chown -R {0}:{0} {1}".format(USER, BACKUP_DIR))
+        sudo("passwd {}".format(USER))
+        _create_secret_key_file()
+
+def _configure_supervisord():
+    for daemon in ["router", "pipeliner", "broker", "web"]:
+        config_file_path = os.path.join(PYPLN_DEPLOY_ROOT,
+                "server_config/pypln-{}.conf".format(daemon))
+        sudo("ln -sf {} /etc/supervisor/conf.d/".format(config_file_path))
+
+    # Commenting out the path to the socket that supervisorctl uses should make
+    # it fallback to it's default of connecting on localhost:9001.  This should
+    # allow non-root users to control the running processes.
+    supervisor_conf = "/etc/supervisor/supervisord.conf"
+    comment(supervisor_conf,
+                "^serverurl=unix:///var/run//supervisor.sock .*",
+                use_sudo=True, char=";")
+    append(supervisor_conf, ["[inet_http_server]", "port=127.0.0.1:9001"],
+                use_sudo=True)
+    _reload_supervisord()
+
+def _configure_nginx():
+    nginx_vhost_path = os.path.join(PYPLN_DEPLOY_ROOT, "server_config/nginx.conf")
+    sudo("ln -sf {} /etc/nginx/sites-enabled/pypln".format(nginx_vhost_path))
+    sudo("service nginx restart")
+
+def _clone_repos(rev):
+    run("git clone {} {}".format(WEB_REPO_URL, PYPLN_WEB_ROOT))
+    run("git clone {} {}".format(BACKEND_REPO_URL, PYPLN_BACKEND_ROOT))
+    run("git clone {} {}".format(DEPLOY_REPO_URL, PYPLN_DEPLOY_ROOT))
+    _update_code(rev)
+
 def create_db(db_user, db_name, db_host="localhost", db_port=5432):
     # we choose a random password with letters, numbers and some punctuation.
     db_password = ''.join(random.choice(string.ascii_letters + string.digits +\
@@ -73,13 +122,6 @@ def create_db(db_user, db_name, db_host="localhost", db_port=5432):
         sudo('chown {0}:{0} {1}'.format(USER, pgpass_path))
         sudo('chmod 600 {}'.format(pgpass_path))
         sudo('createdb "{}" -O "{}"'.format(db_name, db_user), user='postgres')
-
-def _create_secret_key_file():
-    valid_chars = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)'
-    secret_key = ''.join([random.choice(valid_chars) for i in range(50)])
-    secret_key_file_path = os.path.join(HOME, ".secret_key")
-    sudo("echo '{}' > {}".format(secret_key, secret_key_file_path))
-    sudo('chown {0}:{0} {1}'.format(USER, secret_key_file_path))
 
 def db_backup():
     now = datetime.datetime.now()
@@ -103,55 +145,21 @@ def install_system_packages():
         "postgresql", "python-psycopg2"])
     sudo("apt-get update")
     sudo("apt-get install -y {}".format(packages))
-
-def initial_setup(rev="master"):
-    install_system_packages()
     # Updating virtualenv is specially important since the default changed
     # to not giving access to system python packages and the option to disable
     # this didn't exist in old versions.
     sudo("pip install --upgrade virtualenv")
 
-    with settings(warn_only=True):
-        user_does_not_exist = run("id {}".format(USER)).failed
-
-    if user_does_not_exist:
-        sudo("useradd --shell=/bin/bash --home {} --create-home {}".format(
-            HOME, USER))
-        sudo("mkdir {}".format(LOG_DIR))
-        sudo("chown -R {0}:{0} {1}".format(USER, LOG_DIR))
-        sudo("mkdir {}".format(BACKUP_DIR))
-        sudo("chown -R {0}:{0} {1}".format(USER, BACKUP_DIR))
-        sudo("passwd {}".format(USER))
-        _create_secret_key_file()
+def initial_setup(rev="master"):
+    install_system_packages()
+    _create_deploy_user()
 
     with settings(warn_only=True, user=USER):
-        run("git clone {} {}".format(WEB_REPO_URL, PYPLN_WEB_ROOT))
-        run("git clone {} {}".format(BACKEND_REPO_URL, PYPLN_BACKEND_ROOT))
-        run("git clone {} {}".format(DEPLOY_REPO_URL, PYPLN_DEPLOY_ROOT))
-        _update_code(rev)
+        _clone_repos(rev)
         run("virtualenv --system-site-packages {}".format(PROJECT_ROOT))
 
-    for daemon in ["router", "pipeliner", "broker", "web"]:
-        config_file_path = os.path.join(PYPLN_DEPLOY_ROOT,
-                "server_config/pypln-{}.conf".format(daemon))
-        sudo("ln -sf {} /etc/supervisor/conf.d/".format(config_file_path))
-
-    # Commenting out the path to the socket that supervisorctl uses should make
-    # it fallback to it's default of connecting on localhost:9001.  This should
-    # allow non-root users to control the running processes.
-    supervisor_conf = "/etc/supervisor/supervisord.conf"
-    comment(supervisor_conf,
-                "^serverurl=unix:///var/run//supervisor.sock .*",
-                use_sudo=True, char=";")
-    append(supervisor_conf, ["[inet_http_server]", "port=127.0.0.1:9001"],
-                use_sudo=True)
-
-    _reload_supervisord()
-
-    nginx_vhost_path = os.path.join(PYPLN_DEPLOY_ROOT, "server_config/nginx.conf")
-    sudo("ln -sf {} /etc/nginx/sites-enabled/pypln".format(nginx_vhost_path))
-    sudo("service nginx restart")
-
+    _configure_supervisord()
+    _configure_nginx()
     create_db('pypln', 'pypln')
 
 def deploy(rev="master"):
@@ -175,9 +183,7 @@ def deploy(rev="master"):
         run("supervisorctl reload")
 
 def manage(command, environment="production"):
-    # FIXME: we need to be in the web root because of path issues that should
-    # be fixed
-    with prefix("source {}".format(ACTIVATE_SCRIPT)), cd(DJANGO_PROJECT_ROOT), settings(user=USER):
+    with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER):
         manage_script = os.path.join(DJANGO_PROJECT_ROOT, "manage.py")
         run("python {} {} --settings=settings.{}".format(manage_script,
             command, environment))
