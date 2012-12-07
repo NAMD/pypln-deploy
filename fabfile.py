@@ -183,9 +183,7 @@ def deploy(rev="master"):
         run("supervisorctl reload")
 
 def manage(command, environment="production"):
-    # FIXME: we need to be in the web root because of path issues that should
-    # be fixed
-    with prefix("source {}".format(ACTIVATE_SCRIPT)), cd(DJANGO_PROJECT_ROOT), settings(user=USER):
+    with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER):
         manage_script = os.path.join(DJANGO_PROJECT_ROOT, "manage.py")
         run("python {} {} --settings=settings.{}".format(manage_script,
             command, environment))
