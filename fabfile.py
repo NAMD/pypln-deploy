@@ -74,6 +74,8 @@ def _create_deploy_user():
         sudo("chown -R {0}:{0} {1}".format(USER, LOG_DIR))
         sudo("mkdir {}".format(BACKUP_DIR))
         sudo("chown -R {0}:{0} {1}".format(USER, BACKUP_DIR))
+        sudo("mkdir {}".format(PROJECT_ROOT))
+        sudo("chown -R {0}:{0} {1}".format(USER, PROJECT_ROOT))
         sudo("passwd {}".format(USER))
         _create_secret_key_file()
 
