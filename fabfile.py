@@ -20,7 +20,7 @@ import datetime
 import os
 import random
 import string
-from fabric.api import cd, run, sudo, settings, prefix, abort
+from fabric.api import cd, run, sudo, settings, prefix, abort, prompt
 from fabric.contrib.files import comment, append
 from fabric.contrib.console import confirm
 
@@ -66,6 +66,18 @@ def _create_secret_key_file():
     sudo("echo '{}' > {}".format(secret_key, secret_key_file_path))
     sudo('chown {0}:{0} {1}'.format(USER, secret_key_file_path))
 
+def _create_smtp_config():
+    smtp_config_file_path = os.path.join(HOME, ".smtp_config")
+    smtp_host = prompt("smtp host:", default="smtp.gmail.com")
+    smtp_port = prompt("smtp port:", default=587)
+    smtp_user = prompt("smtp user:")
+    smtp_password = prompt("smtp password:")
+    smtp_config = "{}:{}:{}:{}".format(smtp_host, smtp_port, smtp_user,
+            smtp_password)
+    sudo("echo '{}' > {}".format(smtp_config, smtp_config_file_path))
+    sudo('chown {0}:{0} {1}'.format(USER, smtp_config_file_path))
+    sudo('chmod 600 {1}'.format(USER, smtp_config_file_path))
+
 def _create_deploy_user():
     with settings(warn_only=True):
         user_does_not_exist = run("id {}".format(USER)).failed
@@ -81,6 +93,7 @@ def _create_deploy_user():
         sudo("chown -R {0}:{0} {1}".format(USER, PROJECT_ROOT))
         sudo("passwd {}".format(USER))
         _create_secret_key_file()
+        _create_smtp_config()
 
 def _configure_supervisord():
     for daemon in ["router", "pipeliner", "broker", "web"]:
