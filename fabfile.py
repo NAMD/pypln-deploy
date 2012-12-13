@@ -43,18 +43,21 @@ def _reload_supervisord():
     sudo("service supervisor stop")
     sudo("service supervisor start")
 
-def _update_repository(rev):
+def _update_repository(branch):
+    # TODO: We need a better way to do this. But this has to be a branch name,
+    # since we'll use it for all repositories.
     run("git remote update")
-    run("git checkout {}".format(rev))
-    run("git reset --hard {}".format(rev))
+    sha1 = run("git rev-parse origin/{}".format(branch))
+    run("git checkout {}".format(branch))
+    run("git reset --hard {}".format(sha1))
 
-def _update_code(rev="master"):
+def _update_code(branch="master"):
     with cd(PYPLN_BACKEND_ROOT):
-        _update_repository(rev)
+        _update_repository(branch)
     with cd(PYPLN_WEB_ROOT):
-        _update_repository(rev)
+        _update_repository(branch)
     with cd(PYPLN_DEPLOY_ROOT):
-        _update_repository(rev)
+        _update_repository(branch)
 
 def _create_secret_key_file():
     valid_chars = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)'
@@ -101,11 +104,11 @@ def _configure_nginx():
     sudo("ln -sf {} /etc/nginx/sites-enabled/pypln".format(nginx_vhost_path))
     sudo("service nginx restart")
 
-def _clone_repos(rev):
+def _clone_repos(branch):
     run("git clone {} {}".format(WEB_REPO_URL, PYPLN_WEB_ROOT))
     run("git clone {} {}".format(BACKEND_REPO_URL, PYPLN_BACKEND_ROOT))
     run("git clone {} {}".format(DEPLOY_REPO_URL, PYPLN_DEPLOY_ROOT))
-    _update_code(rev)
+    _update_code(branch)
 
 def create_db(db_user, db_name, db_host="localhost", db_port=5432):
     # we choose a random password with letters, numbers and some punctuation.
@@ -152,21 +155,21 @@ def install_system_packages():
     # this didn't exist in old versions.
     sudo("pip install --upgrade virtualenv")
 
-def initial_setup(rev="master"):
+def initial_setup(branch="master"):
     install_system_packages()
     _create_deploy_user()
 
     with settings(warn_only=True, user=USER):
-        _clone_repos(rev)
+        _clone_repos(branch)
         run("virtualenv --system-site-packages {}".format(PROJECT_ROOT))
 
     _configure_supervisord()
     _configure_nginx()
     create_db('pypln', 'pypln')
 
-def deploy(rev="master"):
+def deploy(branch="master"):
     with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER), cd(PROJECT_ROOT):
-        _update_code(rev)
+        _update_code(branch)
         with cd(PYPLN_BACKEND_ROOT):
             run("python setup.py install")
 
