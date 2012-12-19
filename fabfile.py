@@ -20,9 +20,11 @@ import datetime
 import os
 import random
 import string
+
 from fabric.api import cd, run, sudo, settings, prefix, abort, prompt
 from fabric.contrib.files import comment, append
 from fabric.contrib.console import confirm
+
 
 USER = "pypln"
 HOME = "/srv/pypln/"
@@ -38,10 +40,31 @@ WEB_REPO_URL = "https://github.com/NAMD/pypln.web.git"
 DEPLOY_REPO_URL = "https://github.com/NAMD/pypln-deploy.git"
 ACTIVATE_SCRIPT = os.path.join(PROJECT_ROOT, "bin/activate")
 
-def _reload_supervisord():
+def _stop_supervisord():
     # XXX: Why does supervisor's init script exit with 1 on "restart"?
     sudo("service supervisor stop")
+
+def _start_supervisord():
     sudo("service supervisor start")
+
+def _restart_supervisord():
+    _stop_supervisord()
+    _start_supervisord()
+
+def _restart_nginx():
+    sudo("service nginx restart")
+
+def restart_services():
+    '''Restart supervisord and nginx
+
+    This task is needed because of a bug that's happenning sometimes (we don't
+    know how to solve it entirely yet)
+
+    Note that it must be run as a user that has sudo access.
+    '''
+    _stop_supervisord()
+    _restart_nginx()
+    _start_supervisord()
 
 def _update_repository(branch):
     # TODO: We need a better way to do this. But this has to be a branch name,
@@ -110,7 +133,7 @@ def _configure_supervisord():
                 use_sudo=True, char=";")
     append(supervisor_conf, ["[inet_http_server]", "port=127.0.0.1:9001"],
                 use_sudo=True)
-    _reload_supervisord()
+    _restart_supervisord()
 
 def _configure_nginx():
     nginx_vhost_path = os.path.join(PYPLN_DEPLOY_ROOT, "server_config/nginx.conf")
