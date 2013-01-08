@@ -146,6 +146,10 @@ def _clone_repos(branch):
     run("git clone {} {}".format(DEPLOY_REPO_URL, PYPLN_DEPLOY_ROOT))
     _update_code(branch)
 
+def _update_crontab():
+    crontab_file = os.path.join(PYPLN_DEPLOY_ROOT, "server_config/crontab")
+    run('crontab %s' % crontab_file)
+
 def create_db(db_user, db_name, db_host="localhost", db_port=5432):
     # we choose a random password with letters, numbers and some punctuation.
     db_password = ''.join(random.choice(string.ascii_letters + string.digits +\
@@ -217,6 +221,8 @@ def deploy(branch="master"):
             run("pip install -r requirements/project.txt")
 
         run("python -m nltk.downloader all")
+
+        _update_crontab()
 
         manage("syncdb --noinput")
         manage("collectstatic --noinput")
