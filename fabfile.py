@@ -225,6 +225,7 @@ def deploy(branch="master"):
         _update_crontab()
 
         manage("syncdb --noinput")
+        manage("migrate")
         manage("collectstatic --noinput")
 
         run("supervisorctl reload")
