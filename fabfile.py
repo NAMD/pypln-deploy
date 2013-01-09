@@ -170,7 +170,7 @@ def create_db(db_user, db_name, db_host="localhost", db_port=5432):
 
 def db_backup():
     now = datetime.datetime.now()
-    filename = now.strftime("pypln_%Y-%M-%d_%H-%m-%S.backup")
+    filename = now.strftime("pypln_%Y-%m-%d_%H-%M-%S.backup")
     backup_file_path = os.path.join(BACKUP_DIR, filename)
     with settings(user=USER):
         run("pg_dump -Fc -o -f {}".format(backup_file_path))
