@@ -226,6 +226,8 @@ def deploy(branch="master"):
 
         manage("syncdb --noinput")
         manage("migrate")
+        manage("loaddata {}".format(os.path.join(PYPLN_DEPLOY_ROOT,
+            'server_config/initial_data/sites.json')))
         manage("collectstatic --noinput")
 
         run("supervisorctl reload")
