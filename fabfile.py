@@ -21,8 +21,8 @@ import os
 import random
 import string
 
-from fabric.api import cd, run, sudo, settings, prefix, abort, prompt
-from fabric.contrib.files import comment, append
+from fabric.api import cd, run, sudo, settings, prefix, abort, prompt, env
+from fabric.contrib.files import comment, append, sed
 from fabric.contrib.console import confirm
 
 
@@ -226,8 +226,7 @@ def deploy(branch="master"):
 
         manage("syncdb --noinput")
         manage("migrate")
-        manage("loaddata {}".format(os.path.join(PYPLN_DEPLOY_ROOT,
-            'server_config/initial_data/sites.json')))
+        load_site_data()
         manage("collectstatic --noinput")
 
         run("supervisorctl reload")
@@ -237,3 +236,9 @@ def manage(command, environment="production"):
         manage_script = os.path.join(DJANGO_PROJECT_ROOT, "manage.py")
         run("python {} {} --settings=settings.{}".format(manage_script,
             command, environment))
+
+def load_site_data():
+    initial_data_file = os.path.join(PYPLN_DEPLOY_ROOT,
+            'server_config/initial_data/sites.json')
+    sed(initial_data_file, "%%HOST%%", env.host_string, backup='')
+    manage("loaddata {}".format(initial_data_file))
