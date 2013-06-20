@@ -123,9 +123,10 @@ def _create_deploy_user():
         _create_smtp_config()
 
 def _configure_supervisord():
-    for daemon in ["router", "pipeliner", "broker", "web"]:
+    for daemon in ["pypln-router", "pypln-pipeliner", "pypln-broker",
+            "pypln-web", "stanford_ner_7_classes"]:
         config_file_path = os.path.join(PYPLN_DEPLOY_ROOT,
-                "server_config/pypln-{}.conf".format(daemon))
+                "server_config/{}.conf".format(daemon))
         sudo("ln -sf {} /etc/supervisor/conf.d/".format(config_file_path))
 
     # Commenting out the path to the socket that supervisorctl uses should make
@@ -191,7 +192,7 @@ def install_system_packages():
     packages = " ".join(["python-setuptools", "python-pip",
         "python-numpy", "build-essential", "python-dev", "mongodb",
         "pdftohtml", "git-core", "supervisor", "nginx", "python-virtualenv",
-        "postgresql", "python-psycopg2", "unzip"])
+        "postgresql", "python-psycopg2", "unzip", "openjdk-7-jre"])
     sudo("apt-get update")
     sudo("apt-get install -y {}".format(packages))
     # Updating virtualenv is specially important since the default changed
@@ -208,12 +209,13 @@ def download_stanford_ner():
     expected_hash = ("5b4be9226a358b041ab225357c1cf1f8a1d"
         "25c82ecb84021775bd35ef2494614")
 
-    #run("wget {} -O {}".format(stanford_ner_url, zip_path))
+    run("wget {} -O {}".format(stanford_ner_url, zip_path))
     download_hash = run("sha256sum {}".format(zip_path)).split()[0]
     if download_hash != expected_hash:
         abort("Stanford NER does not match expected hash!")
     run("unzip -o -x {} -d {}".format(zip_path, NER_BASE_DIR))
-    run("mv -f {} {}".format(os.path.join(NER_BASE_DIR, package_dir),
+    run("rm -r {}".format(os.path.join(NER_BASE_DIR, "stanford_ner")))
+    run("mv {} {}".format(os.path.join(NER_BASE_DIR, package_dir),
         os.path.join(NER_BASE_DIR, "stanford_ner")))
 
 def initial_setup(branch="master"):
@@ -223,6 +225,9 @@ def initial_setup(branch="master"):
     with settings(warn_only=True, user=USER):
         _clone_repos(branch)
         run("virtualenv --system-site-packages {}".format(PROJECT_ROOT))
+
+    with settings(user=USER):
+        download_stanford_ner()
 
     with settings(user=USER):
         download_stanford_ner()
