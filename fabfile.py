@@ -214,7 +214,7 @@ def download_stanford_ner():
     if download_hash != expected_hash:
         abort("Stanford NER does not match expected hash!")
     run("unzip -o -x {} -d {}".format(zip_path, NER_BASE_DIR))
-    run("rm -r {}".format(os.path.join(NER_BASE_DIR, "stanford_ner")))
+    run("rm -rf {}".format(os.path.join(NER_BASE_DIR, "stanford_ner")))
     run("mv {} {}".format(os.path.join(NER_BASE_DIR, package_dir),
         os.path.join(NER_BASE_DIR, "stanford_ner")))
 
@@ -241,20 +241,17 @@ def deploy(branch="master"):
         _update_code(branch)
         with cd(PYPLN_BACKEND_ROOT):
             run("python setup.py install")
+            run("pip install -r requirements/production.txt")
 
         with cd(PYPLN_WEB_ROOT):
             run("python setup.py install")
-
-        #TODO: We need to put all pypln.web requirements in one place.
-        with cd(DJANGO_PROJECT_ROOT):
-            run("pip install -r requirements/project.txt")
 
         run("python -m nltk.downloader all")
 
         _update_crontab()
 
         manage("syncdb --noinput")
-        manage("migrate")
+        # manage("migrate") # We don't have migrations for now.
         load_site_data()
         manage("collectstatic --noinput")
 
@@ -262,8 +259,8 @@ def deploy(branch="master"):
 
 def manage(command, environment="production"):
     with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER):
-        manage_script = os.path.join(DJANGO_PROJECT_ROOT, "manage.py")
-        run("python {} {} --settings=settings.{}".format(manage_script,
+        manage_script = os.path.join(PYPLN_WEB_ROOT, "manage.py")
+        run("python {} {} --settings=pypln.web.settings.{}".format(manage_script,
             command, environment))
 
 def load_site_data():
