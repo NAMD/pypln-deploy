@@ -124,7 +124,7 @@ def _create_deploy_user():
 
 def _configure_supervisord():
     for daemon in ["pypln-router", "pypln-pipeliner", "pypln-broker",
-            "pypln-web", "stanford_ner_3_classes", "stanford_ner_7_classes"]:
+            "pypln-web", "stanford_ner_7_classes"]:
         config_file_path = os.path.join(PYPLN_DEPLOY_ROOT,
                 "server_config/{}.conf".format(daemon))
         sudo("ln -sf {} /etc/supervisor/conf.d/".format(config_file_path))
