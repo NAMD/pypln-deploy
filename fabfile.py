@@ -229,9 +229,6 @@ def initial_setup(branch="master"):
     with settings(user=USER):
         download_stanford_ner()
 
-    with settings(user=USER):
-        download_stanford_ner()
-
     _configure_supervisord()
     _configure_nginx()
     create_db('pypln', 'pypln')
