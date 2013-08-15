@@ -218,6 +218,10 @@ def download_stanford_ner():
     run("mv {} {}".format(os.path.join(NER_BASE_DIR, package_dir),
         os.path.join(NER_BASE_DIR, "stanford_ner")))
 
+def update_allowed_hosts():
+    allowed_hosts_file = os.path.join(HOME, ".pypln_allowed_hosts")
+    run("echo '{}' > {}".format(env.host_string, allowed_hosts_file))
+
 def initial_setup(branch="master"):
     install_system_packages()
     _create_deploy_user()
@@ -246,6 +250,7 @@ def deploy(branch="master"):
         run("python -m nltk.downloader all")
 
         _update_crontab()
+        update_allowed_hosts()
 
         manage("syncdb --noinput")
         # manage("migrate") # We don't have migrations for now.
