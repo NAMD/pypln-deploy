@@ -40,6 +40,8 @@ WEB_REPO_URL = "https://github.com/NAMD/pypln.web.git"
 DEPLOY_REPO_URL = "https://github.com/NAMD/pypln-deploy.git"
 ACTIVATE_SCRIPT = os.path.join(PROJECT_ROOT, "bin/activate")
 
+NER_BASE_DIR = os.path.join(HOME, "NER/")
+
 def _stop_supervisord():
     # XXX: Why does supervisor's init script exit with 1 on "restart"?
     sudo("service supervisor stop")
@@ -114,14 +116,17 @@ def _create_deploy_user():
         sudo("chown -R {0}:{0} {1}".format(USER, BACKUP_DIR))
         sudo("mkdir {}".format(PROJECT_ROOT))
         sudo("chown -R {0}:{0} {1}".format(USER, PROJECT_ROOT))
+        sudo("mkdir {}".format(NER_BASE_DIR))
+        sudo("chown -R {0}:{0} {1}".format(USER, NER_BASE_DIR))
         sudo("passwd {}".format(USER))
         _create_secret_key_file()
         _create_smtp_config()
 
 def _configure_supervisord():
-    for daemon in ["router", "pipeliner", "broker", "web"]:
+    for daemon in ["pypln-router", "pypln-pipeliner", "pypln-broker",
+            "pypln-web", "stanford_ner_7_classes"]:
         config_file_path = os.path.join(PYPLN_DEPLOY_ROOT,
-                "server_config/pypln-{}.conf".format(daemon))
+                "server_config/{}.conf".format(daemon))
         sudo("ln -sf {} /etc/supervisor/conf.d/".format(config_file_path))
 
     # Commenting out the path to the socket that supervisorctl uses should make
@@ -187,13 +192,31 @@ def install_system_packages():
     packages = " ".join(["python-setuptools", "python-pip",
         "python-numpy", "build-essential", "python-dev", "mongodb",
         "pdftohtml", "git-core", "supervisor", "nginx", "python-virtualenv",
-        "postgresql", "python-psycopg2"])
+        "postgresql", "python-psycopg2", "unzip", "openjdk-7-jre"])
     sudo("apt-get update")
     sudo("apt-get install -y {}".format(packages))
     # Updating virtualenv is specially important since the default changed
     # to not giving access to system python packages and the option to disable
     # this didn't exist in old versions.
     sudo("pip install --upgrade virtualenv")
+
+def download_stanford_ner():
+    zip_path = os.path.join(NER_BASE_DIR, "stanford_ner.zip")
+    # When a new version of stanford NER comes out, we need to change these
+    # variables to match the new information.
+    stanford_ner_url = "http://nlp.stanford.edu/software/stanford-ner-2013-04-04.zip"
+    package_dir = "stanford-ner-2013-04-04"
+    expected_hash = ("5b4be9226a358b041ab225357c1cf1f8a1d"
+        "25c82ecb84021775bd35ef2494614")
+
+    run("wget {} -O {}".format(stanford_ner_url, zip_path))
+    download_hash = run("sha256sum {}".format(zip_path)).split()[0]
+    if download_hash != expected_hash:
+        abort("Stanford NER does not match expected hash!")
+    run("unzip -o -x {} -d {}".format(zip_path, NER_BASE_DIR))
+    run("rm -rf {}".format(os.path.join(NER_BASE_DIR, "stanford_ner")))
+    run("mv {} {}".format(os.path.join(NER_BASE_DIR, package_dir),
+        os.path.join(NER_BASE_DIR, "stanford_ner")))
 
 def initial_setup(branch="master"):
     install_system_packages()
@@ -202,6 +225,9 @@ def initial_setup(branch="master"):
     with settings(warn_only=True, user=USER):
         _clone_repos(branch)
         run("virtualenv --system-site-packages {}".format(PROJECT_ROOT))
+
+    with settings(user=USER):
+        download_stanford_ner()
 
     _configure_supervisord()
     _configure_nginx()
@@ -212,20 +238,17 @@ def deploy(branch="master"):
         _update_code(branch)
         with cd(PYPLN_BACKEND_ROOT):
             run("python setup.py install")
+            run("pip install -r requirements/production.txt")
 
         with cd(PYPLN_WEB_ROOT):
             run("python setup.py install")
-
-        #TODO: We need to put all pypln.web requirements in one place.
-        with cd(DJANGO_PROJECT_ROOT):
-            run("pip install -r requirements/project.txt")
 
         run("python -m nltk.downloader all")
 
         _update_crontab()
 
         manage("syncdb --noinput")
-        manage("migrate")
+        # manage("migrate") # We don't have migrations for now.
         load_site_data()
         manage("collectstatic --noinput")
 
@@ -233,8 +256,8 @@ def deploy(branch="master"):
 
 def manage(command, environment="production"):
     with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER):
-        manage_script = os.path.join(DJANGO_PROJECT_ROOT, "manage.py")
-        run("python {} {} --settings=settings.{}".format(manage_script,
+        manage_script = os.path.join(PYPLN_WEB_ROOT, "manage.py")
+        run("python {} {} --settings=pypln.web.settings.{}".format(manage_script,
             command, environment))
 
 def load_site_data():
