@@ -220,7 +220,7 @@ def download_stanford_ner():
 
 def update_allowed_hosts():
     allowed_hosts_file = os.path.join(HOME, ".pypln_allowed_hosts")
-    run("echo '{}' > {}".format(env.host_string, allowed_hosts_file))
+    append(allowed_hosts_file, env.host_string)
 
 def initial_setup(branch="master"):
     install_system_packages()
