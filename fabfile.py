@@ -247,7 +247,7 @@ def deploy(branch="master"):
         with cd(PYPLN_WEB_ROOT):
             run("python setup.py install")
 
-        run("python -m nltk.downloader all")
+        run("python -m nltk.downloader genesis maxent_treebank_pos_tagger punkt")
 
         _update_crontab()
         update_allowed_hosts()
