@@ -75,11 +75,19 @@ def _update_repository(branch):
     run("git checkout {}".format(branch))
     run("git reset --hard {}".format(sha1))
 
+def _update_version_sha1(branch):
+    sha1 = run("git rev-parse origin/{}".format(branch))
+    template_path = os.path.join(PYPLN_WEB_ROOT, "pypln/web/templates/rest_framework/api.html")
+    append(template_path, "{{% block footer %}}<!-- current version: {} --> {{% "
+            "endblock %}}".format(sha1))
+
+
 def _update_code(branch="master"):
     with cd(PYPLN_BACKEND_ROOT):
         _update_repository(branch)
     with cd(PYPLN_WEB_ROOT):
         _update_repository(branch)
+        _update_version_sha1(branch)
     with cd(PYPLN_DEPLOY_ROOT):
         _update_repository(branch)
 
