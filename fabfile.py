@@ -226,6 +226,7 @@ def deploy(branch="master"):
         _update_code(branch)
         with cd(PYPLN_BACKEND_ROOT):
             run("python setup.py install")
+            run("pip install Cython")
             run("pip install -r requirements/production.txt")
 
         with cd(PYPLN_WEB_ROOT):
