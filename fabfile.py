@@ -197,7 +197,7 @@ def install_system_packages():
     packages = " ".join(["python-setuptools", "python-pip",
         "python-numpy", "build-essential", "python-dev", "mongodb",
         "pdftohtml", "git-core", "supervisor", "nginx", "python-virtualenv",
-        "postgresql", "python-psycopg2"])
+        "postgresql", "python-psycopg2", "libfreetype6-dev", "fonts-dejavu"])
     sudo("apt-get update")
     sudo("apt-get install -y {}".format(packages))
     # Updating virtualenv is specially important since the default changed
