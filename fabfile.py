@@ -128,8 +128,7 @@ def _create_deploy_user():
         _create_smtp_config()
 
 def _configure_supervisord():
-    for daemon in ["pypln-router", "pypln-pipeliner", "pypln-broker",
-            "pypln-web"]:
+    for daemon in ["pypln-web"]:
         config_file_path = os.path.join(PYPLN_DEPLOY_ROOT,
                 "server_config/{}.conf".format(daemon))
         sudo("ln -sf {} /etc/supervisor/conf.d/".format(config_file_path))
