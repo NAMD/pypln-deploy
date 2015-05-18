@@ -128,8 +128,7 @@ def _create_deploy_user():
         _create_smtp_config()
 
 def _configure_supervisord():
-    for daemon in ["pypln-router", "pypln-pipeliner", "pypln-broker",
-            "pypln-web"]:
+    for daemon in ["pypln-backend", "pypln-web"]:
         config_file_path = os.path.join(PYPLN_DEPLOY_ROOT,
                 "server_config/{}.conf".format(daemon))
         sudo("ln -sf {} /etc/supervisor/conf.d/".format(config_file_path))
@@ -194,10 +193,11 @@ def db_restore(filename, db_name="pypln"):
     sudo("pg_restore -d template1 -C {}".format(backup_file_path), user="postgres")
 
 def install_system_packages():
-    packages = " ".join(["python-setuptools", "python-pip",
-        "python-numpy", "build-essential", "python-dev", "mongodb",
-        "pdftohtml", "git-core", "supervisor", "nginx", "python-virtualenv",
-        "postgresql", "python-psycopg2", "libfreetype6-dev", "fonts-dejavu"])
+    packages = " ".join(["rabbitmq-server", "libenchant-dev",
+        "python-setuptools", "python-pip", "python-numpy", "build-essential",
+        "python-dev", "mongodb", "pdftohtml", "git-core", "supervisor",
+        "nginx", "python-virtualenv", "postgresql", "python-psycopg2",
+        "libfreetype6-dev", "fonts-dejavu"])
     sudo("apt-get update")
     sudo("apt-get install -y {}".format(packages))
     # Updating virtualenv is specially important since the default changed
