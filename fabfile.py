@@ -234,7 +234,7 @@ def initial_setup(branch="master"):
     _configure_nginx()
     create_db('pypln', 'pypln')
 
-def deploy(branch="master"):
+def deploy_backend(branch="master"):
     with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER), cd(PROJECT_ROOT):
         _update_backend_code(branch)
         with cd(PYPLN_BACKEND_ROOT):
@@ -242,12 +242,16 @@ def deploy(branch="master"):
             run("pip install Cython")
             run("pip install -r requirements/production.txt")
 
+        run("python -m nltk.downloader genesis maxent_treebank_pos_tagger "
+                "punkt stopwords")
+
+        run("supervisorctl reload")
+
+def deploy_web(branch="master"):
+    with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER), cd(PROJECT_ROOT):
         _update_web_code(branch)
         with cd(PYPLN_WEB_ROOT):
             run("python setup.py install")
-
-        run("python -m nltk.downloader genesis maxent_treebank_pos_tagger "
-                "punkt stopwords")
 
         update_allowed_hosts()
 
@@ -257,6 +261,10 @@ def deploy(branch="master"):
         manage("collectstatic --noinput")
 
         run("supervisorctl reload")
+
+def deploy(branch="master"):
+    deploy_backend(branch)
+    deploy_web(branch)
 
 def manage(command, environment="production"):
     with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER):
