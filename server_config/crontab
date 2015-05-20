@@ -1,1 +1,0 @@
-* * * * * /srv/pypln/project/deploy/exec_in_virtualenv.sh /srv/pypln/project/web/pypln/web/manage.py update_index --settings=settings.production

@@ -249,7 +249,6 @@ def deploy(branch="master"):
         run("python -m nltk.downloader genesis maxent_treebank_pos_tagger "
                 "punkt stopwords")
 
-        _update_crontab()
         update_allowed_hosts()
 
         manage("syncdb --noinput")
