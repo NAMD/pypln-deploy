@@ -162,10 +162,14 @@ def _configure_nginx():
     sudo("ln -sf {} /etc/nginx/sites-enabled/pypln".format(nginx_vhost_path))
     sudo("service nginx restart")
 
-def _clone_repos(branch):
-    run("git clone {} {}".format(WEB_REPO_URL, PYPLN_WEB_ROOT))
+def _clone_backend_repos(branch):
     run("git clone {} {}".format(BACKEND_REPO_URL, PYPLN_BACKEND_ROOT))
     run("git clone {} {}".format(DEPLOY_REPO_URL, PYPLN_DEPLOY_ROOT))
+    _update_code(branch)
+
+def _clone_web_repos(branch):
+    run("git clone {} {}".format(WEB_REPO_URL, PYPLN_WEB_ROOT))
+    run("git clone {} {}".format(BACKEND_REPO_URL, PYPLN_BACKEND_ROOT))
     _update_code(branch)
 
 def _update_crontab():
@@ -227,7 +231,7 @@ def initial_backend_setup(branch="master"):
     _create_deploy_user()
 
     with settings(warn_only=True, user=USER):
-        _clone_repos(branch)
+        _clone_backend_repos(branch)
         run("virtualenv --system-site-packages {}".format(PROJECT_ROOT))
 
     _configure_supervisord(["pypln-backend"])
@@ -237,7 +241,7 @@ def initial_web_setup(branch="master"):
     _create_deploy_user()
 
     with settings(warn_only=True, user=USER):
-        _clone_repos(branch)
+        _clone_web_repos(branch)
         run("virtualenv --system-site-packages {}".format(PROJECT_ROOT))
 
     _configure_supervisord(["pypln-web"])
