@@ -140,8 +140,8 @@ def _create_deploy_user():
         _create_secret_key_file()
         _create_smtp_config()
 
-def _configure_supervisord():
-    for daemon in ["pypln-backend", "pypln-web"]:
+def _configure_supervisord(daemons):
+    for daemon in daemons:
         config_file_path = os.path.join(PYPLN_DEPLOY_ROOT,
                 "server_config/{}.conf".format(daemon))
         sudo("ln -sf {} /etc/supervisor/conf.d/".format(config_file_path))
@@ -222,7 +222,7 @@ def update_allowed_hosts():
     allowed_hosts_file = os.path.join(HOME, ".pypln_allowed_hosts")
     append(allowed_hosts_file, env.host_string)
 
-def initial_setup(branch="master"):
+def initial_backend_setup(branch="master"):
     install_system_packages()
     _create_deploy_user()
 
@@ -230,9 +230,24 @@ def initial_setup(branch="master"):
         _clone_repos(branch)
         run("virtualenv --system-site-packages {}".format(PROJECT_ROOT))
 
-    _configure_supervisord()
+    _configure_supervisord(["pypln-backend"])
+
+def initial_web_setup(branch="master"):
+    install_system_packages()
+    _create_deploy_user()
+
+    with settings(warn_only=True, user=USER):
+        _clone_repos(branch)
+        run("virtualenv --system-site-packages {}".format(PROJECT_ROOT))
+
+    _configure_supervisord(["pypln-web"])
     _configure_nginx()
     create_db('pypln', 'pypln')
+
+
+def initial_setup(branch="master"):
+    initial_backend_setup(branch)
+    initial_web_setup(branch)
 
 def deploy_backend(branch="master"):
     with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER), cd(PROJECT_ROOT):
