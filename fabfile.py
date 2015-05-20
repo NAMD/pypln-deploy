@@ -81,15 +81,28 @@ def _update_version_sha1(branch):
     append(template_path, "{{% block footer %}}<!-- current version: {} --> {{% "
             "endblock %}}".format(sha1))
 
+def _update_deploy_code(branch):
+    with cd(PYPLN_DEPLOY_ROOT):
+        _update_repository(branch)
 
-def _update_code(branch="master"):
+def _update_backend_code(branch):
+    # We should alway update the deploy code because new configurations should
+    # be applied even when deploying only the backend
+    _update_deploy_code(branch)
     with cd(PYPLN_BACKEND_ROOT):
         _update_repository(branch)
+
+def _update_web_code(branch):
+    # We also have configurations for the web app in the deploy repository, so
+    # we also need to update it here
+    _update_deploy_code(branch)
     with cd(PYPLN_WEB_ROOT):
         _update_repository(branch)
         _update_version_sha1(branch)
-    with cd(PYPLN_DEPLOY_ROOT):
-        _update_repository(branch)
+
+def _update_code(branch="master"):
+    _update_backend_code(branch)
+    _update_web_code(branch)
 
 def _create_secret_key_file():
     valid_chars = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)'
@@ -223,12 +236,13 @@ def initial_setup(branch="master"):
 
 def deploy(branch="master"):
     with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER), cd(PROJECT_ROOT):
-        _update_code(branch)
+        _update_backend_code(branch)
         with cd(PYPLN_BACKEND_ROOT):
             run("python setup.py install")
             run("pip install Cython")
             run("pip install -r requirements/production.txt")
 
+        _update_web_code(branch)
         with cd(PYPLN_WEB_ROOT):
             run("python setup.py install")
 
