@@ -81,15 +81,28 @@ def _update_version_sha1(branch):
     append(template_path, "{{% block footer %}}<!-- current version: {} --> {{% "
             "endblock %}}".format(sha1))
 
+def _update_deploy_code(branch):
+    with cd(PYPLN_DEPLOY_ROOT):
+        _update_repository(branch)
 
-def _update_code(branch="master"):
+def _update_backend_code(branch):
+    # We should alway update the deploy code because new configurations should
+    # be applied even when deploying only the backend
+    _update_deploy_code(branch)
     with cd(PYPLN_BACKEND_ROOT):
         _update_repository(branch)
+
+def _update_web_code(branch):
+    # We also have configurations for the web app in the deploy repository, so
+    # we also need to update it here
+    _update_deploy_code(branch)
     with cd(PYPLN_WEB_ROOT):
         _update_repository(branch)
         _update_version_sha1(branch)
-    with cd(PYPLN_DEPLOY_ROOT):
-        _update_repository(branch)
+
+def _update_code(branch="master"):
+    _update_backend_code(branch)
+    _update_web_code(branch)
 
 def _create_secret_key_file():
     valid_chars = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)'
@@ -127,8 +140,8 @@ def _create_deploy_user():
         _create_secret_key_file()
         _create_smtp_config()
 
-def _configure_supervisord():
-    for daemon in ["pypln-backend", "pypln-web"]:
+def _configure_supervisord(daemons):
+    for daemon in daemons:
         config_file_path = os.path.join(PYPLN_DEPLOY_ROOT,
                 "server_config/{}.conf".format(daemon))
         sudo("ln -sf {} /etc/supervisor/conf.d/".format(config_file_path))
@@ -149,10 +162,14 @@ def _configure_nginx():
     sudo("ln -sf {} /etc/nginx/sites-enabled/pypln".format(nginx_vhost_path))
     sudo("service nginx restart")
 
-def _clone_repos(branch):
-    run("git clone {} {}".format(WEB_REPO_URL, PYPLN_WEB_ROOT))
+def _clone_backend_repos(branch):
     run("git clone {} {}".format(BACKEND_REPO_URL, PYPLN_BACKEND_ROOT))
     run("git clone {} {}".format(DEPLOY_REPO_URL, PYPLN_DEPLOY_ROOT))
+    _update_code(branch)
+
+def _clone_web_repos(branch):
+    run("git clone {} {}".format(WEB_REPO_URL, PYPLN_WEB_ROOT))
+    run("git clone {} {}".format(BACKEND_REPO_URL, PYPLN_BACKEND_ROOT))
     _update_code(branch)
 
 def _update_crontab():
@@ -209,33 +226,52 @@ def update_allowed_hosts():
     allowed_hosts_file = os.path.join(HOME, ".pypln_allowed_hosts")
     append(allowed_hosts_file, env.host_string)
 
-def initial_setup(branch="master"):
+def initial_backend_setup(branch="master"):
     install_system_packages()
     _create_deploy_user()
 
     with settings(warn_only=True, user=USER):
-        _clone_repos(branch)
+        _clone_backend_repos(branch)
         run("virtualenv --system-site-packages {}".format(PROJECT_ROOT))
 
-    _configure_supervisord()
+    _configure_supervisord(["pypln-backend"])
+
+def initial_web_setup(branch="master"):
+    install_system_packages()
+    _create_deploy_user()
+
+    with settings(warn_only=True, user=USER):
+        _clone_web_repos(branch)
+        run("virtualenv --system-site-packages {}".format(PROJECT_ROOT))
+
+    _configure_supervisord(["pypln-web"])
     _configure_nginx()
     create_db('pypln', 'pypln')
 
-def deploy(branch="master"):
+
+def initial_setup(branch="master"):
+    initial_backend_setup(branch)
+    initial_web_setup(branch)
+
+def deploy_backend(branch="master"):
     with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER), cd(PROJECT_ROOT):
-        _update_code(branch)
+        _update_backend_code(branch)
         with cd(PYPLN_BACKEND_ROOT):
             run("python setup.py install")
             run("pip install Cython")
             run("pip install -r requirements/production.txt")
 
-        with cd(PYPLN_WEB_ROOT):
-            run("python setup.py install")
-
         run("python -m nltk.downloader genesis maxent_treebank_pos_tagger "
                 "punkt stopwords")
 
-        _update_crontab()
+        run("supervisorctl reload")
+
+def deploy_web(branch="master"):
+    with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER), cd(PROJECT_ROOT):
+        _update_web_code(branch)
+        with cd(PYPLN_WEB_ROOT):
+            run("python setup.py install")
+
         update_allowed_hosts()
 
         manage("syncdb --noinput")
@@ -244,6 +280,10 @@ def deploy(branch="master"):
         manage("collectstatic --noinput")
 
         run("supervisorctl reload")
+
+def deploy(branch="master"):
+    deploy_backend(branch)
+    deploy_web(branch)
 
 def manage(command, environment="production"):
     with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER):
