@@ -159,6 +159,7 @@ def _configure_supervisord(daemons):
 
 def _configure_nginx():
     nginx_vhost_path = os.path.join(PYPLN_DEPLOY_ROOT, "server_config/nginx.conf")
+    sed(nginx_vhost_path, "%%HOST%%", env.host_string, backup='')
     sudo("ln -sf {} /etc/nginx/sites-enabled/pypln".format(nginx_vhost_path))
     sudo("service nginx restart")
 
