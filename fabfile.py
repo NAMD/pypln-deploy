@@ -263,7 +263,7 @@ def deploy_backend(branch="master"):
             run("pip install -r requirements/production.txt")
 
         run("python -m nltk.downloader genesis maxent_treebank_pos_tagger "
-                "punkt stopwords")
+                "punkt stopwords averaged_perceptron_tagger")
 
         run("supervisorctl reload")
 
