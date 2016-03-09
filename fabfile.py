@@ -151,7 +151,7 @@ def _configure_supervisord(daemons):
     # allow non-root users to control the running processes.
     supervisor_conf = "/etc/supervisor/supervisord.conf"
     comment(supervisor_conf,
-                "^serverurl=unix:///var/run//supervisor.sock .*",
+                "^serverurl=unix:///var/run/supervisor.sock .*",
                 use_sudo=True, char=";")
     append(supervisor_conf, ["[inet_http_server]", "port=127.0.0.1:9001"],
                 use_sudo=True)
