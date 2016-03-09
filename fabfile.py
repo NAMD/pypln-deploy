@@ -22,7 +22,7 @@ import random
 import string
 
 from fabric.api import cd, run, sudo, settings, prefix, abort, prompt, env
-from fabric.contrib.files import comment, append, sed
+from fabric.contrib.files import comment, append, sed, contains
 from fabric.contrib.console import confirm
 
 
@@ -39,6 +39,7 @@ BACKEND_REPO_URL = "https://github.com/NAMD/pypln.backend.git"
 WEB_REPO_URL = "https://github.com/NAMD/pypln.web.git"
 DEPLOY_REPO_URL = "https://github.com/NAMD/pypln-deploy.git"
 ACTIVATE_SCRIPT = os.path.join(PROJECT_ROOT, "bin/activate")
+CONFIG_FILE = os.path.join(HOME, 'settings.ini')
 
 
 def _stop_supervisord():
@@ -104,12 +105,19 @@ def _update_code(branch="master"):
     _update_backend_code(branch)
     _update_web_code(branch)
 
-def _create_secret_key_file():
+def set_config_option(option, new_value):
+    with settings(user=USER):
+        if contains(CONFIG_FILE, option):
+            # This regex should only match lines that contain the desired
+            # option: from the begining of the line to the first '=' there
+            # should only be spaces and the option string.
+            run("sed -i '/^[[:space:]]*{}[[:space:]]*=/Id' {}".format(option, CONFIG_FILE))
+        append(CONFIG_FILE, '{} = {}'.format(option, new_value))
+
+def _create_secret_key():
     valid_chars = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$^&*(-_=+)'
     secret_key = ''.join([random.choice(valid_chars) for i in range(50)])
-    secret_key_file_path = os.path.join(HOME, ".secret_key")
-    sudo("echo '{}' > {}".format(secret_key, secret_key_file_path))
-    sudo('chown {0}:{0} {1}'.format(USER, secret_key_file_path))
+    set_config_option('SECRET_KEY', secret_key)
 
 def _create_smtp_config():
     smtp_config_file_path = os.path.join(HOME, ".smtp_config")
@@ -117,11 +125,9 @@ def _create_smtp_config():
     smtp_port = prompt("smtp port:", default=587)
     smtp_user = prompt("smtp user:")
     smtp_password = prompt("smtp password:")
-    smtp_config = "{}:{}:{}:{}".format(smtp_host, smtp_port, smtp_user,
+    smtp_config = "{},{},{},{}".format(smtp_host, smtp_port, smtp_user,
             smtp_password)
-    sudo("echo '{}' > {}".format(smtp_config, smtp_config_file_path))
-    sudo('chown {0}:{0} {1}'.format(USER, smtp_config_file_path))
-    sudo('chmod 600 {1}'.format(USER, smtp_config_file_path))
+    set_config_option('EMAIL_CONFIG', smtp_config)
 
 def _create_deploy_user():
     with settings(warn_only=True):
@@ -137,8 +143,12 @@ def _create_deploy_user():
         sudo("mkdir {}".format(PROJECT_ROOT))
         sudo("chown -R {0}:{0} {1}".format(USER, PROJECT_ROOT))
         sudo("passwd {}".format(USER))
-        _create_secret_key_file()
+        sudo("echo '[settings]' > {}".format(CONFIG_FILE))
+        sudo("chown {0}:{0} {1}".format(USER, CONFIG_FILE))
+        _create_secret_key()
         _create_smtp_config()
+        # Set the admin
+        set_config_option("ADMIN", "pypln,pyplnproject@gmail.com")
 
 def _configure_supervisord(daemons):
     for daemon in daemons:
@@ -166,12 +176,12 @@ def _configure_nginx():
 def _clone_backend_repos(branch):
     run("git clone {} {}".format(BACKEND_REPO_URL, PYPLN_BACKEND_ROOT))
     run("git clone {} {}".format(DEPLOY_REPO_URL, PYPLN_DEPLOY_ROOT))
-    _update_code(branch)
+    _update_backend_code(branch)
 
 def _clone_web_repos(branch):
     run("git clone {} {}".format(WEB_REPO_URL, PYPLN_WEB_ROOT))
     run("git clone {} {}".format(BACKEND_REPO_URL, PYPLN_BACKEND_ROOT))
-    _update_code(branch)
+    _update_web_code(branch)
 
 def _update_crontab():
     crontab_file = os.path.join(PYPLN_DEPLOY_ROOT, "server_config/crontab")
@@ -183,16 +193,13 @@ def create_db(db_user, db_name, db_host="localhost", db_port=5432):
             '#.,+=') for i in range(32))
 
     pgpass_path = os.path.join(HOME, ".pgpass")
-    pgpass_content = "{}:{}:{}:{}:{}".format(db_host, db_port, db_name,
-            db_user, db_password)
+    set_config_option('DATABASE_URL', "postgres://{}:{}@{}:{}/{}".format(db_user,
+        db_password, db_host, db_port, db_name))
 
     with settings(warn_only=True):
         user_creation = sudo('psql template1 -c "CREATE USER {} WITH CREATEDB ENCRYPTED PASSWORD \'{}\'"'.format(db_user, db_password), user='postgres')
 
     if not user_creation.failed:
-        sudo("echo '{}' > {}".format(pgpass_content, pgpass_path))
-        sudo('chown {0}:{0} {1}'.format(USER, pgpass_path))
-        sudo('chmod 600 {}'.format(pgpass_path))
         sudo('createdb "{}" -O "{}"'.format(db_name, db_user), user='postgres')
 
 def db_backup():
@@ -225,8 +232,7 @@ def install_system_packages():
     sudo("pip install --upgrade virtualenv")
 
 def update_allowed_hosts():
-    allowed_hosts_file = os.path.join(HOME, ".pypln_allowed_hosts")
-    append(allowed_hosts_file, env.host_string)
+    set_config_option('ALLOWED_HOSTS', env.host)
 
 def initial_backend_setup(branch="master"):
     install_system_packages()
@@ -272,6 +278,7 @@ def deploy_web(branch="master"):
     with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER), cd(PROJECT_ROOT):
         _update_web_code(branch)
         with cd(PYPLN_WEB_ROOT):
+            run("pip install -r requirements/production.txt")
             run("python setup.py install")
 
         update_allowed_hosts()
@@ -290,8 +297,7 @@ def deploy(branch="master"):
 def manage(command, environment="production"):
     with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER):
         manage_script = os.path.join(PYPLN_WEB_ROOT, "manage.py")
-        run("python {} {} --settings=pypln.web.settings.{}".format(manage_script,
-            command, environment))
+        run("python {} {}".format(manage_script, command))
 
 def load_site_data():
     initial_data_file = os.path.join(PYPLN_DEPLOY_ROOT,
