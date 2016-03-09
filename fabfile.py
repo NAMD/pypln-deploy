@@ -159,7 +159,7 @@ def _configure_supervisord(daemons):
 
 def _configure_nginx():
     nginx_vhost_path = os.path.join(PYPLN_DEPLOY_ROOT, "server_config/nginx.conf")
-    sed(nginx_vhost_path, "%%HOST%%", env.host_string, backup='', use_sudo=True)
+    sed(nginx_vhost_path, "%%HOST%%", env.host, backup='', use_sudo=True)
     sudo("ln -sf {} /etc/nginx/sites-enabled/pypln".format(nginx_vhost_path))
     sudo("service nginx restart")
 
@@ -295,5 +295,5 @@ def manage(command, environment="production"):
 def load_site_data():
     initial_data_file = os.path.join(PYPLN_DEPLOY_ROOT,
             'server_config/initial_data/sites.json')
-    sed(initial_data_file, "%%HOST%%", env.host_string, backup='')
+    sed(initial_data_file, "%%HOST%%", env.host, backup='')
     manage("loaddata {}".format(initial_data_file))
