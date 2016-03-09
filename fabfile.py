@@ -105,7 +105,7 @@ def _update_code(branch="master"):
     _update_web_code(branch)
 
 def _create_secret_key_file():
-    valid_chars = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)'
+    valid_chars = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$^&*(-_=+)'
     secret_key = ''.join([random.choice(valid_chars) for i in range(50)])
     secret_key_file_path = os.path.join(HOME, ".secret_key")
     sudo("echo '{}' > {}".format(secret_key, secret_key_file_path))
@@ -180,7 +180,7 @@ def _update_crontab():
 def create_db(db_user, db_name, db_host="localhost", db_port=5432):
     # we choose a random password with letters, numbers and some punctuation.
     db_password = ''.join(random.choice(string.ascii_letters + string.digits +\
-            '#.,/?@+=') for i in range(32))
+            '#.,+=') for i in range(32))
 
     pgpass_path = os.path.join(HOME, ".pgpass")
     pgpass_content = "{}:{}:{}:{}:{}".format(db_host, db_port, db_name,
