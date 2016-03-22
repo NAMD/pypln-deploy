@@ -187,6 +187,11 @@ def _update_crontab():
     crontab_file = os.path.join(PYPLN_DEPLOY_ROOT, "server_config/crontab")
     run('crontab %s' % crontab_file)
 
+def configure_mongodb(mongodb_port=27017, mongodb_name):
+    mongodb_host = prompt("mongodb host:", default="localhost")
+    set_config_option('MONGODB_CONFIG', "mongodb://{}:{}/{}".format(mongodb_host,
+        mongodb_port, mongodb_name))
+
 def create_db(db_user, db_name, db_host="localhost", db_port=5432):
     # we choose a random password with letters, numbers and some punctuation.
     db_password = ''.join(random.choice(string.ascii_letters + string.digits +\
@@ -237,6 +242,7 @@ def update_allowed_hosts():
 def initial_backend_setup(branch="master"):
     install_system_packages()
     _create_deploy_user()
+    configure_mongodb()
 
     with settings(warn_only=True, user=USER):
         _clone_backend_repos(branch)
@@ -247,6 +253,7 @@ def initial_backend_setup(branch="master"):
 def initial_web_setup(branch="master"):
     install_system_packages()
     _create_deploy_user()
+    configure_mongodb()
 
     with settings(warn_only=True, user=USER):
         _clone_web_repos(branch)
