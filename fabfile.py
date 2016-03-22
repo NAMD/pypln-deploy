@@ -187,7 +187,7 @@ def _update_crontab():
     crontab_file = os.path.join(PYPLN_DEPLOY_ROOT, "server_config/crontab")
     run('crontab %s' % crontab_file)
 
-def configure_mongodb(mongodb_port=27017, mongodb_name):
+def configure_mongodb(mongodb_port=27017, mongodb_name="pypln"):
     mongodb_host = prompt("mongodb host:", default="localhost")
     set_config_option('MONGODB_CONFIG', "mongodb://{}:{}/{}".format(mongodb_host,
         mongodb_port, mongodb_name))
