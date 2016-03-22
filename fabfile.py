@@ -120,7 +120,6 @@ def _create_secret_key():
     set_config_option('SECRET_KEY', secret_key)
 
 def _create_smtp_config():
-    smtp_config_file_path = os.path.join(HOME, ".smtp_config")
     smtp_host = prompt("smtp host:", default="smtp.gmail.com")
     smtp_port = prompt("smtp port:", default=587)
     smtp_user = prompt("smtp user:")
@@ -197,7 +196,6 @@ def create_db(db_user, db_name, db_host="localhost", db_port=5432):
     db_password = ''.join(random.choice(string.ascii_letters + string.digits +\
             '#.,+=') for i in range(32))
 
-    pgpass_path = os.path.join(HOME, ".pgpass")
     set_config_option('DATABASE_URL', "postgres://{}:{}@{}:{}/{}".format(db_user,
         db_password, db_host, db_port, db_name))
 
