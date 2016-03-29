@@ -280,8 +280,10 @@ def deploy_backend(branch="master"):
         run("supervisorctl reload")
 
 def deploy_web(branch="master"):
+    _configure_nginx()
     with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER), cd(PROJECT_ROOT):
         _update_web_code(branch)
+
         with cd(PYPLN_WEB_ROOT):
             run("pip install -r requirements/production.txt")
             run("python setup.py install")
