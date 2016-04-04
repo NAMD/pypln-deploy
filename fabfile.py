@@ -280,7 +280,6 @@ def deploy_backend(branch="master"):
         run("supervisorctl reload")
 
 def deploy_web(branch="master"):
-    _configure_nginx()
     with prefix("source {}".format(ACTIVATE_SCRIPT)), settings(user=USER), cd(PROJECT_ROOT):
         _update_web_code(branch)
 
@@ -296,6 +295,8 @@ def deploy_web(branch="master"):
         manage("collectstatic --noinput")
 
         run("supervisorctl reload")
+
+    _configure_nginx()
 
 def deploy(branch="master"):
     deploy_backend(branch)
